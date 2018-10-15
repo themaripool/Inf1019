@@ -19,7 +19,10 @@ typedef struct Processos
 int main()
 {	
 	
-	Processos *proc[count];
+	pid_t pid;
+	int status;
+	
+	Processos *proc[count]; //Array de struct de processos
 	char url[]="exec.txt",
 	     ch1[200], ch2[200], ch3[200];
 	FILE *arq;
@@ -27,7 +30,7 @@ int main()
 	char aux[200];
 	
 
-	//CRIANDO STRUCT DE PROCESSOS COMPARTILHADOS
+	//CRIANDO ARRAY DE PROCESSOS NA MEMORIA COMPARTILHADA
 	int shmid;
 	int i = 0, j=0;
 	key_t key = 12345;
@@ -42,8 +45,8 @@ int main()
 		proc[i] = (Processos*)malloc(count*sizeof(Processos));
 	}
 
-	shmdt((void *) proc[0]);
-	//FIM CRIACAO DOS STRUCTS
+	
+	//FIM CRIACAO DO ARRAY
 
 
 
@@ -76,12 +79,37 @@ int main()
 	fclose(arq);
 	//Fechando arquivo com processos
 
+	
+	if(pid = (fork() != 0)) //Processo pai
+	{
+		waitpid(pid, &status, 0);
+	}
+	//ESCALONADOR
+	else 
+	{
+		char aux[200];
+		char buffer[20];
+		printf("PID = %d \n", getpid());
+		
+		//CRIANDO PATH COM ARGUMENTO PARA OS PROCESSOS
+		strcpy(aux, proc[0]->path);
+		strcat(aux, " ");
+		sprintf(buffer,"%d",getpid());
+		strcat(aux, buffer);
+		//printf("%s --\n", aux);
+		//FIM DA CRIACAO DO PATH
+				
+		system(aux);//ABRINDO O PROGRAMA
+		exit(1);
+	
+	}
+
+	
 	for(i=0;i<count;i++)
 	{
-		free(proc[i]);//Liberando malloc da memoria
+		free(proc[i]);//Liberando malloc dos processos
 	}
-	
-
+	shmdt((void *) proc[0]);
 	return 0;
 
 }
