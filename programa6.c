@@ -13,18 +13,15 @@ void rotinaDePreempcao(int sinal);
 int main()
 {
 	
-	int i = 0
-	signal(SIGSTOP, rotinaDePreempcao);
-	signal(SIGCONT, rotinaDePreempcao);
-	
-	
+	int i = 0;
 	
 	printf("%d\n" ,getpid());
-	
-	while(i<10)
+	kill(getpid(), SIGSTOP);
+	while(i<30)
 	{
 		sleep(1);
-		printf("Processo 5 executando\n");
+		printf("Processo executando 6\n");
+		i++;
 	}
 	
 	
@@ -35,18 +32,4 @@ int main()
 }
 
 
-void rotinaDePreempcao(int sinal)
-{
-    switch(sinal)
-    {
-   	 case SIGSTOP:
-		printf("Processo 5 interrompido");
-		pause();
-		break;
-   	 
-   	 case SIGCONT:
-		printf("Processo 5 executando");
-		break;
-   	}
 
-}

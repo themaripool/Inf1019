@@ -6,47 +6,26 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <limits.h>
-#include <signal.h>
-
-void rotinaDePreempcao(int sinal);
 
 int main()
 {
 	int i = 0;
-
-	
-	
-	
 	
 	printf("%d\n" ,getpid());
+	kill(getpid(), SIGSTOP);
 	
-	while(i<10)
+	while(i<30)
 	{
 		sleep(1);
 		printf("Processo executando 2\n");
+		i++;
 	}
 	
 	
-	signal(SIGSTOP, rotinaDePreempcao);
-	signal(SIGCONT, rotinaDePreempcao);
+
 
 	return 0;
 
 }
 
 
-void rotinaDePreempcao(int sinal)
-{
-    switch(sinal)
-    {
-   	 case SIGSTOP:
-		printf("Processo 1 interrompido");
-		pause();
-		break;
-   	 
-   	 case SIGCONT:
-		printf("Processo 1 executando");
-		break;
-   	}
-
-}

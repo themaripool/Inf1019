@@ -6,9 +6,9 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <limits.h>
+#include <signal.h>
 
 #define count 7
-
 
 
 typedef struct Processos
@@ -25,25 +25,24 @@ int main()
 {	
 	
 	pid_t pid;
+	int *pid_esc;
 	int status;
 	Processos *proc; //Array de struct de processos
-	
-	
-	
-	
 
 	//CRIANDO ARRAY DE PROCESSOS NA MEMORIA COMPARTILHADA
-	int shmid, shmid2;
+	int shmid, shmid2, shmidpid;
 	int i = 0;
 	int *j;
 	key_t key1 = 12345;
-	key_t key2 = 33452;//ITERADOR
 
-	shmid2 = shmget (IPC_PRIVATE, sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	shmid2 = shmget (IPC_PRIVATE, 2 *sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	shmidpid = shmget (IPC_PRIVATE, sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 	shmid = shmget(key1, count*sizeof(Processos), IPC_CREAT);
 
 	j = (int *)shmat(shmid2, 0, 0);
-	*j = 0;
+	j[0] = 0;
+	j[1] = 0;
+	pid_esc = (int *)shmat(shmidpid, 0, 0);//Local para pegar pid do escalonador
 	
 	proc = (Processos *)shmat(shmid, 0, 0);
 	//proc = (Processos*)malloc(count*sizeof(Processos));
@@ -83,33 +82,48 @@ int main()
 					strcpy(aux,cwd);
 					strcat(aux, "/");
 					strcpy(aux, strcat(aux, ch2));
-					strcpy(proc[*j].path, aux); //PATH DO PROGRAMA	
-					//strcpy(proc[j]->path, ch2); 
-					proc[*j].prioridade = atoi(&ch3[11]); //PRIORIDADE
-					printf("%s %d--\n", proc[*j].path, proc[*j].prioridade);
-					//execv(proc[j]->path, NULL);				
+					strcpy(proc[j[0]].path, aux); //PATH DO PROGRAMA	
+					proc[j[0]].prioridade = atoi(&ch3[11]); //PRIORIDADE
+					//printf("%s %d--\n", proc[j[0]].path, proc[j[0]].prioridade);			
+										
 					sleep(1);
-					*j = *j + 1; //Passando para o proximo endereco do array de Processos
-						
-				}
+					j[0]++;
+					kill(*pid_esc, SIGCONT);
+					 //Passando para o proximo endereco do array de Processos
+					}
 	
 		fclose(arq);
 		//Fechando arquivo com processos
 		
-		waitpid(pid, &status, 0);
 	}
-	//ESCALONADOR
 	else 
 	{	
 		printf("PID-%d\n", getpid());
-		while(*j<count)
+		
+		
+		
+		while(1==1)
 		{
-			printf("%s --\n", proc[*j].path);
-			execv(proc[*j].path, NULL);
-			sleep(1);
+			if(j[1] < count)
+			{				
+				if(pid = (fork() != 0))
+				{
+					*pid_esc = getpid();
+					kill(getpid(), SIGSTOP);	
+					 	
+				}
+
+				else //INICIANDO PROCESSOS
+				{
+					proc[j[1]].pid = getpid();
+					execv(proc[j[1]].path, NULL);
+				}
+			}
+			// CODIGO DO ESCALONADOR VAI AQUI
+			kill(proc[j[1]].pid, SIGCONT);
+			j[1]++;	
 		}
-
-
+	
 
 
 		//FOR
@@ -124,6 +138,8 @@ int main()
 	
 	
 	shmdt((void *) proc);
+	shmdt((void *) j);
+	shmdt((void *) pid_esc);
 	return 0;
 
 }

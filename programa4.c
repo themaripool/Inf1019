@@ -8,23 +8,22 @@
 #include <limits.h>
 #include <signal.h>
 
-void rotinaDePreempcao(int sinal);
 
 int main()
 {
 	
 	int i = 0;
-	signal(SIGSTOP, rotinaDePreempcao);
-	signal(SIGCONT, rotinaDePreempcao);
 	
 	
 	
 	printf("%d\n" ,getpid());
+	kill(getpid(), SIGSTOP);
 	
-	while(i<10)
+	while(i<30)
 	{
 		sleep(1);
-		printf("Processo 3 executando\n");
+		printf("Processo executando 4\n");
+		i++;
 	}
 	
 	
@@ -36,18 +35,3 @@ int main()
 }
 
 
-void rotinaDePreempcao(int sinal)
-{
-    switch(sinal)
-    {
-   	 case SIGSTOP:
-		printf("Processo 3 interrompido");
-		pause();
-		break;
-   	 
-   	 case SIGCONT:
-		printf("Processo 3 executando");
-		break;
-   	}
-
-}
