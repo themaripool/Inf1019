@@ -13,7 +13,7 @@ void rotinaDePreempcao(int sinal);
 int main()
 {
 	
-
+	int i = 0;
 	signal(SIGSTOP, rotinaDePreempcao);
 	signal(SIGCONT, rotinaDePreempcao);
 	
@@ -21,7 +21,7 @@ int main()
 	
 	printf("%d\n" ,getpid());
 	
-	while(1==1)
+	while(i<10)
 	{
 		sleep(1);
 		printf("Processo 4 executando\n");
