@@ -16,7 +16,6 @@ int main()
 	
 	
 	printf("%d\n" ,getpid());
-	kill(getpid(), SIGSTOP);
 	while(i<30)
 	{
 		sleep(1);

@@ -7,18 +7,36 @@
 #include <sys/wait.h>
 #include <limits.h>
 #include <signal.h>
+#include <sys/sem.h>
 
 #define count 7
 
 
 typedef struct Processos
 {
-	char path[200];
+	char path[100];
 	int prioridade;
 	int pid;
 } Processos;
 
-void sortPrioridades(Processos *proc[], int cont);
+void sortPrioridades(Processos *proc, int cont);
+
+int criaProcesso (int n, Processos *proc);
+
+union semun
+{
+	int val;
+	struct semid_ds *buf;
+	ushort *array;
+};
+// inicializa o valor do semáforo
+int setSemValue(int semId);
+// remove o semáforo
+void delSemValue(int semId);
+// operação P
+int semaforoP(int semId);
+//operação V
+int semaforoV(int semId);
 
 
 int main()
@@ -27,17 +45,24 @@ int main()
 	pid_t pid;
 	int *pid_esc;
 	int status;
+	int semId;
 	Processos *proc; //Array de struct de processos
+
+	
 
 	//CRIANDO ARRAY DE PROCESSOS NA MEMORIA COMPARTILHADA
 	int shmid, shmid2, shmidpid;
 	int i = 0;
 	int *j;
-	key_t key1 = 12345;
+
+ 	semId = semget (IPC_PRIVATE, 1, 0666 | IPC_CREAT);
+   	setSemValue(semId);
+    sleep (2);
+
 
 	shmid2 = shmget (IPC_PRIVATE, 2 *sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 	shmidpid = shmget (IPC_PRIVATE, sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
-	shmid = shmget(key1, count*sizeof(Processos), IPC_CREAT);
+	shmid = shmget(IPC_PRIVATE, count*sizeof(Processos), IPC_CREAT);
 
 	j = (int *)shmat(shmid2, 0, 0);
 	j[0] = 0;
@@ -48,13 +73,15 @@ int main()
 	//proc = (Processos*)malloc(count*sizeof(Processos));
 	for(i=0;i<count;i++)
 	{		
-		
+		proc[i].pid = -1;
 		proc[i].prioridade = 1000;
+		strcpy(proc[i].path, " ");
 	}
 	//FIM CRIACAO DO ARRAY
 
 	
 
+	//sortPrioridades(proc, count);
 	
 	
 	
@@ -64,9 +91,9 @@ int main()
 	{
 		FILE *arq;
 		char programas[]="exec.txt",
-	    ch1[200], ch2[200], ch3[200];
-		char cwd[200];
-		char aux[200];
+	    ch1[100], ch2[100], ch3[100];
+		char cwd[100];
+		char aux[100];
 		if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		   perror("getcwd() error");
 		   return 1;
@@ -88,8 +115,8 @@ int main()
 										
 					sleep(1);
 					j[0]++;
-					kill(*pid_esc, SIGCONT);
-					 //Passando para o proximo endereco do array de Processos
+					semaforoV(semId);
+					
 					}
 	
 		fclose(arq);
@@ -99,33 +126,25 @@ int main()
 	else 
 	{	
 		printf("PID-%d\n", getpid());
-		
-		
-		
+		i=0;
 		while(1==1)
-		{
-			if(j[1] < count)
-			{				
-				if(pid = (fork() != 0))
-				{
-					*pid_esc = getpid();
-					kill(getpid(), SIGSTOP);	
-					 	
-				}
-
-				else //INICIANDO PROCESSOS
-				{
-					proc[j[1]].pid = getpid();
-					execv(proc[j[1]].path, NULL);
-				}
-			}
-			// CODIGO DO ESCALONADOR VAI AQUI
-			kill(proc[j[1]].pid, SIGCONT);
-			j[1]++;	
+		{	
+			
+			//sleep(1);
+			if(i < count)
+			{	
+					
+				semaforoP(semId);
+				proc[i].pid = criaProcesso(i, proc);
+				printf("%d ------\n\n", proc[i].pid);
+				
+			}				
+				
+			//kill(proc[2].pid, SIGCONT);
+			i++;
+			
 		}
-	
-
-
+		
 		//FOR
 			// COMPARA PID DO EXECUTANDO[0] COM PRONTO[0]
 			// SE PRIORIDADE DO EXECUTANDO[0] FOR MAIOR QUE O DO PRONTO[0]
@@ -146,27 +165,76 @@ int main()
 
 
 
-void sortPrioridades(Processos *proc[], int cont)
+void sortPrioridades(Processos *proc, int cont)
 {
 	int i, j, aux;
 	
 	for (j = 1; j < cont; j++) {
    		for (i = 0; i < cont - 1; i++) {
-     		if (proc[i]->prioridade > proc[i + 1]->prioridade) {
-			   aux = proc[i]->prioridade;
-			   proc[i]->prioridade = proc[i + 1]->prioridade;
-			   proc[i + 1]->prioridade = aux;
+     		if (proc[i].prioridade > proc[i + 1].prioridade) {
+			   aux = proc[i].prioridade;
+			   proc[i].prioridade = proc[i + 1].prioridade;
+			   proc[i + 1].prioridade = aux;
      		}
    		}
 	 }
 
-	/*for (i = 0; i < cont; i++) {
- 		printf("%d\n", proc[i]->prioridade);
-	}*/
+	for (i = 0; i < cont; i++) {
+ 		printf("%d\n", proc[i].prioridade);
+	}
 	
 }
 
 
+int setSemValue(int semId)
+{
+	union semun semUnion;
+	semUnion.val = 0;
+	return semctl(semId, 0, SETVAL, semUnion);
+}
+void delSemValue(int semId)
+{
+	union semun semUnion;
+	semctl(semId, 0, IPC_RMID, semUnion);
+}
+int semaforoP(int semId)
+{
+	struct sembuf semB;
+	semB.sem_num = 0;
+	semB.sem_op = -1;
+	semB.sem_flg = SEM_UNDO;
+	semop(semId, &semB, 1);
+	return 0;
+}
+int semaforoV(int semId)
+{
+	struct sembuf semB;
+	semB.sem_num = 0;
+	semB.sem_op = 1;
+	semB.sem_flg = SEM_UNDO;
+	semop(semId, &semB, 1);
+	return 0;
+}
+
+int criaProcesso (int i, Processos *proc) {
+  int pid;
+  pid = fork(); /* Executa o fork */
+
+
+  if (pid < 0) {
+    return -1;
+	}
+	else if ( pid != 0 ) { /* PAI */
+    kill(pid, SIGSTOP); /* Pausa o filho */
+    // printf("PROCESSO %d PAUSADO!\n", pid);
+    return pid;
+  	} 
+
+	else { /* FILHO */
+    execv(proc[i].path, NULL);
+  	}
+  return 0;
+}
 
 
 
