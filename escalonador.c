@@ -155,7 +155,14 @@ int main()
 			kill(proc[i].pid, SIGCONT);
 			i++;	
 		}
-		
+	
+		//FOR
+			// COMPARA PID DO EXECUTANDO[0] COM PRONTO[0]
+			// SE PRIORIDADE DO EXECUTANDO[0] FOR MAIOR QUE O DO PRONTO[0]
+			// DAR SIGSTOP EM EXECUTANDO[0], JOGA EXECUTANDO[0] PARA PRONTO[COUNT-1]
+			// E JOGAR PRONTO[0] NO EXECUTANDO[0] E DA SORTPRIORIDADE
+			// SIGCONT NO EXECUTANDO[0]->PID
+		//END-FOR	
 	}
 
 	
@@ -258,6 +265,7 @@ int criaProcesso (Processos *executando, Processos *proc)
 	}
 	return 0;
 }	
+
 
 
 
