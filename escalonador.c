@@ -9,7 +9,7 @@
 #include <signal.h>
 #include <sys/sem.h>
 
-#define count 7
+#define count 8 //1 A MAIS
 
 
 typedef struct Processos
@@ -21,7 +21,7 @@ typedef struct Processos
 
 void sortPrioridades(Processos *proc, int cont);
 
-int criaProcesso (int n, Processos *proc);
+int criaProcesso (Processos *executando, Processos *proc);
 
 union semun
 {
@@ -52,11 +52,12 @@ int main()
 	int status;
 	int semId;
 	Processos *proc; //Array de struct de processos
+	Processos *executando;
 
 	
 
 	//CRIANDO ARRAY DE PROCESSOS NA MEMORIA COMPARTILHADA
-	int shmid, shmid2, shmidpid;
+	int shmid, shmid2, shmidexec;
 	int i = 0;
 	int *j;
 
@@ -65,21 +66,24 @@ int main()
     sleep (2);
 
 
-	shmid2 = shmget (IPC_PRIVATE, 2 *sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
-	shmidpid = shmget (IPC_PRIVATE, sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	shmid2 = shmget (IPC_PRIVATE, sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 	shmid = shmget(IPC_PRIVATE, count*sizeof(Processos), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	shmidexec = shmget(IPC_PRIVATE, sizeof(Processos), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 
 	j = (int *)shmat(shmid2, 0, 0);
-	j[0] = 0;
-	j[1] = 0;
-	pid_esc = (int *)shmat(shmidpid, 0, 0);//Local para pegar pid do escalonador
+	*j = 0;
+	executando = (Processos *)shmat(shmidexec, 0, 0);//Local para pegar pid do escalonador
 	
 	proc = (Processos *)shmat(shmid, 0, 0);
-	//proc = (Processos*)malloc(count*sizeof(Processos));
+	
+	executando[i].pid = -1;
+	executando[i].prioridade = 100;
+	strcpy(executando[i].path, " ");
+	
 	for(i=0;i<count;i++)
 	{		
 		proc[i].pid = -1;
-		proc[i].prioridade = 1000;
+		proc[i].prioridade = 100;
 		strcpy(proc[i].path, " ");
 	}
 	//FIM CRIACAO DO ARRAY
@@ -114,56 +118,51 @@ int main()
 					strcpy(aux,cwd);
 					strcat(aux, "/");
 					strcpy(aux, strcat(aux, ch2));
-					strcpy(proc[j[0]].path, aux); //PATH DO PROGRAMA	
-					proc[j[0]].prioridade = atoi(&ch3[11]); //PRIORIDADE
+					strcpy(proc[*j].path, aux); //PATH DO PROGRAMA	
+					proc[*j].prioridade = atoi(&ch3[11]); //PRIORIDADE
 					//printf("%s %d--\n", proc[j[0]].path, proc[j[0]].prioridade);			
 										
 					sleep(1);
-					j[0]++;
+					*j = *j + 1;
+					sortPrioridades(proc, count);
 					semaforoV(semId);
 					
 					}
 	
 		fclose(arq);
 		//Fechando arquivo com processos
-		
+		waitpid(pid, &status, 0);
 	}
 	else 
 	{	
 		printf("PID-%d\n", getpid());
 		i=0;
-		
 		while(1)
 		{	
-				//sleep(1);
+			//sleep(1);
 			if(i < count)
 			{	
 						
 				semaforoP(semId);
-				proc[i].pid = criaProcesso(i, proc);
+				//proc[i].pid = criaProcesso(i, proc);
 				printf("%d ------\n\n", proc[i].pid);
-					
+				if(executando->pid != proc[0].pid);				
+				{				
+					executando->pid = criaProcesso(executando, proc);
+				}	
 			}				
-			
-			if(proc[2].pid!=-1)
-				kill(proc[2].pid, SIGCONT);
+		
+			kill(proc[i].pid, SIGCONT);
 			i++;	
 		}
 	
-		//FOR
-			// COMPARA PID DO EXECUTANDO[0] COM PRONTO[0]
-			// SE PRIORIDADE DO EXECUTANDO[0] FOR MAIOR QUE O DO PRONTO[0]
-			// DAR SIGSTOP EM EXECUTANDO[0], JOGA EXECUTANDO[0] PARA PRONTO[COUNT-1]
-			// E JOGAR PRONTO[0] NO EXECUTANDO[0] E DA SORTPRIORIDADE
-			// SIGCONT NO EXECUTANDO[0]->PID
-		//END-FOR	
+	
 	}
 
 	
-	
+	shmdt((void *) executando);
 	shmdt((void *) proc);
 	shmdt((void *) j);
-	shmdt((void *) pid_esc);
 	return 0;
 
 }
@@ -172,21 +171,30 @@ int main()
 
 void sortPrioridades(Processos *proc, int cont)
 {
-	int i, j, aux;
+	int i, j;
+	Processos aux;
 	
 	for (j = 1; j < cont; j++) {
    		for (i = 0; i < cont - 1; i++) {
      		if (proc[i].prioridade > proc[i + 1].prioridade) {
-			   aux = proc[i].prioridade;
+			   aux.prioridade = proc[i].prioridade;
+			   strcpy(aux.path, proc[i].path);
+			   aux.pid = proc[i].pid;
+
 			   proc[i].prioridade = proc[i + 1].prioridade;
-			   proc[i + 1].prioridade = aux;
+			   strcpy(proc[i].path, proc[i + 1].path);
+			   proc[i].pid = proc[i + 1].pid;
+
+			   proc[i + 1].prioridade = aux.prioridade;
+			   strcpy(proc[i + 1].path, aux.path);
+			   proc[i + 1].pid = aux.pid;
      		}
    		}
 	 }
 
-	for (i = 0; i < cont; i++) {
- 		printf("%d\n", proc[i].prioridade);
-	}
+	//for (i = 0; i < cont; i++) {
+ 	//	printf("%d\n%s\n", proc[i].prioridade, proc[i].path);
+	//}
 	
 }
 
@@ -221,27 +229,36 @@ int semaforoV(int semId)
 	return 0;
 }
 
-int criaProcesso (int i, Processos *proc) {
-  int pid;
-  pid = fork(); /* Executa o fork */
+int criaProcesso (Processos *executando, Processos *proc) 
+{
+	int pid;
+	pid = fork(); /* Executa o fork */
+  
+	if(executando->pid != -1)
+	{	
+		kill(executando->pid, SIGSTOP);
+		proc[count-1].prioridade = executando->prioridade;
+		strcpy(proc[count-1].path, executando->path);
+		proc[count-1].pid = executando->pid;
+  	}
+	strcpy(executando->path, proc[0].path); 
+	executando->prioridade = proc[0].prioridade;
 
-
-  if (pid < 0) {
-    return -1;
+	if (pid < 0) {
+	return -1;
 	}
 	else if ( pid != 0 ) { /* PAI */
-    kill(pid, SIGSTOP);
-	 /* Pausa o filho */
+		kill(pid, SIGSTOP);
+	/* Pausa o filho */
 
-    return pid;
-  	} 
+	return pid;
+	} 
 
 	else { /* FILHO */
-    execv(proc[i].path, NULL);
-  	}
-  return 0;
-}
-
+		execv(executando->path, NULL);
+	}
+	return 0;
+}	
 
 
 
