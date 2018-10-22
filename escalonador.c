@@ -155,8 +155,7 @@ int main()
 			kill(proc[i].pid, SIGCONT);
 			i++;	
 		}
-	
-	
+		
 	}
 
 	
