@@ -16,7 +16,7 @@ int main()
 	int i = 0;
 	
 	printf("%d\n" ,getpid());
-	while(i<30)
+	while(i<3)
 	{
 		sleep(1);
 		printf("Processo executando 6\n");
