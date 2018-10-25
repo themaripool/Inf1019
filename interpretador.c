@@ -10,34 +10,199 @@
 #include <sys/sem.h>
 
 #define count 7 
-#define timeslice 2
+#define timeslice 1
 
 
 
 
-typedef struct Processos
+typedef struct No
 {
-	char path[100];
-	int prioridade;
-	int pid;
-	int contador;
-	struct Processos *prox;
-	
-} Processos;
+    char nome[100];
+    int pid;
+    int prioridade;
+	int temporestante;
+    struct No *prox;
 
-Processos *executando, *aux;
+}No;
 
-Processos *achaUltimo(Processos *l);
+typedef struct Head
+{
+    int n;
+    No* inicio;
 
-int removeProcLista(Processos *l);
+}Head;
 
-int addLista(Processos proc, Processos *l);
 
-void initLista(Processos *l);
 
-int deletaLista(Processos *l);
 
-int criaProcesso (Processos *executando);
+Head*  Cria_Lista ()
+{
+    Head* mo =(Head*)malloc(sizeof(Head));
+    mo->n=0;
+    mo->inicio=NULL;
+    return mo;
+}
+
+
+int Insere_Lista (Head* lista, int pri, char nome[100],int temporestante ,int pid)
+{
+   if(lista==NULL)
+   {
+       return 0;
+   }
+
+   No* node=(No*)malloc(sizeof(No));
+   if(node==NULL)
+   {
+
+       return 0;
+   }
+   node->pid = pid;
+   node->prioridade=pri;
+   strcpy(node->nome,nome);
+   node->temporestante = temporestante;
+   node->prox=NULL;
+   lista->n++;
+
+
+   if(lista->inicio==NULL)
+   {
+    lista->inicio=node;
+    return 1;
+   }
+   else
+   {
+       No* last=lista->inicio;
+       while(last->prox!=NULL)
+       {
+           last=last->prox;
+       }
+       last->prox=node;
+       return 1;
+
+   }
+
+    return -1;
+}
+
+
+No* Procura_pid (Head*lista,int pid)
+{
+    if(lista==NULL)
+    {
+        return NULL;
+    }
+    No* x=lista->inicio;
+    if(x->pid==pid)
+    {
+        return x;
+    }
+    else
+    {
+
+        while(x->prox!=NULL)
+        {
+            x=x->prox;
+            if(x->pid==pid)
+            {
+                return x;
+            }
+
+        }
+    }
+    return NULL;
+}
+
+
+
+No* Procura_pri (Head*lista,int pri)
+{
+    if(lista==NULL)
+    {
+        return NULL;
+    }
+    No* x=lista->inicio;
+    if(x->prioridade==pri)
+    {
+        return x;
+    }
+    else
+    {
+
+        while(x->prox!=NULL)
+        {
+            x=x->prox;
+            if(x->prioridade==pri)
+            {
+                return x;
+            }
+
+        }
+    }
+    return NULL;
+}
+
+
+int size (Head*lista)
+{
+    return lista->n;
+}
+
+
+int Remove(Head*lista, No* node)
+{
+    No* aux;
+    if (lista == NULL)
+    {
+        return 0;
+    }
+    No* x = lista->inicio;
+    if (x == node)
+    {
+        lista->n--;
+        lista->inicio = x->prox;
+        free(x);
+        return 1;
+    }
+    else
+    {
+
+        while (x->prox != NULL)
+        {
+            aux = x;
+            x = x->prox;
+            if (x == node)
+            {
+                lista->n--;
+                aux->prox = x->prox;
+                free(x);
+                return 1;
+            }
+
+        }
+    }
+    return 0;
+}
+
+No* Procura_min_pri (Head*lista)
+{
+    No*x=NULL;
+    int i,j=7;
+    for(i=0;i<j;i++)
+    {
+        x=Procura_pri (lista,i+1);
+        if(x!=NULL)
+        {
+            break;
+        }
+    }
+    return x;
+}
+
+
+No *executando, *aux;
+
+int criaProcesso (No *executando);
 
 void signalhandler(int signal);
 
@@ -63,7 +228,7 @@ int main()
 	int status;
 	int semId;
 	
-	Processos *proc; //Array de struct de processos
+	No *proc; //Array de struct de processos
 	
 	int *j;
 	
@@ -77,28 +242,29 @@ int main()
     sleep (2);
 	
 	shmid2 = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
-	shmid = shmget(IPC_PRIVATE, count*sizeof(Processos), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
-	shmidexec = shmget(IPC_PRIVATE, sizeof(Processos), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
-	shmidaux = shmget(IPC_PRIVATE, sizeof(Processos), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	shmid = shmget(IPC_PRIVATE, count*sizeof(No), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	shmidexec = shmget(IPC_PRIVATE, sizeof(No), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	shmidaux = shmget(IPC_PRIVATE, sizeof(No), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 
 
-	executando = (Processos *)shmat(shmidexec, 0, 0);//Local para pegar pid do escalonador
-	aux = (Processos *)shmat(shmidaux, 0, 0);
-	proc = (Processos *)shmat(shmid, 0, 0);
+	executando = (No *)shmat(shmidexec, 0, 0);//Local para pegar pid do escalonador
+	aux = (No *)shmat(shmidaux, 0, 0);
+	proc = (No *)shmat(shmid, 0, 0);
 
 	j = (int *)shmat(shmid2, 0, 0);
 	*j = 0;
 	
-	executando->pid = -1;
+	executando->pid = 100;
 	executando->prioridade = 100;
-	strcpy(executando->path, " ");
-	executando->contador = 0;
+	strcpy(executando->nome, " ");
+	executando->temporestante = 3;
 	
 	for(i=0;i<count;i++)
 	{		
-		proc[i].pid = -1;
+		proc[i].pid = 100;
 		proc[i].prioridade = 100;
-		strcpy(proc[i].path, " ");
+		strcpy(proc[i].nome, " ");
+		proc[i].temporestante = 3;
 	}
 	//FIM CRIACAO DO ARRAY
 
@@ -116,13 +282,15 @@ int main()
 			while( (fscanf(arq,"%s %s %s\n", &ch1, &ch2, &ch3))!=EOF )
 				{
 					
-					strcpy(proc[*j].path, ch2); //PATH DO PROGRAMA	
+					strcpy(proc[*j].nome, ch2); //PATH DO PROGRAMA	
 					proc[*j].prioridade = atoi(&ch3[11]); //PRIORIDADE
-					//printf("%s %d--\n", proc[*j].path, proc[*j].prioridade);			
+					proc[*j].temporestante = 3;
+					//printf("%s %d--\n", proc[*j].nome, proc[*j].prioridade);			
 					
+					*j = *j + 1;
 					sleep(1);
 					semaforoV(semId);
-					*j = *j + 1;
+					
 					}
 	
 		fclose(arq);
@@ -132,146 +300,73 @@ int main()
 	}
 	else 
 	{	
-		signal(SIGUSR1, signalhandler);
-		signal(SIGUSR2, signalhandler);
-		Processos *prio1, *prio2, *prio3, *prio4, *prio5, *prio6, *prio7, *nav;
 		
-		prio1 = (Processos *) malloc(sizeof(Processos));
-		prio2 = (Processos *) malloc(sizeof(Processos));
-		prio3 = (Processos *) malloc(sizeof(Processos));
-		prio4 = (Processos *) malloc(sizeof(Processos));
-		prio5 = (Processos *) malloc(sizeof(Processos));
-		prio6 = (Processos *) malloc(sizeof(Processos));
-		prio7 = (Processos *) malloc(sizeof(Processos));
-		initLista(prio1);
-		initLista(prio2);
-		initLista(prio3);
-		initLista(prio4);
-		initLista(prio5);
-		initLista(prio6);
-		initLista(prio7);
+		Head *prontos = Cria_Lista(); //Insere_Lista (Head* lista, int pri, char nome, int temporestante, int pid)
+		Head *esperando = Cria_Lista();
+		No* pront;
+		No *aux3, *aux4;
+		int k = 0;
+		//Procura_pid(prontos, executando->pid);
+		//Procura_min_pri (Head*lista)
+		//Procura_pri(head*lista)
+		//Remove(Head*lista, No* node)
 		
-		printf("PID-%d\n", getpid());
-		i=0;
-		while(i<count)//Processos ainda vindo do interpretador
-		{		
-			sleep(timeslice);					
-			semaforoP(semId);
-			if(proc[i].prioridade == 1)//LISTAS DE PRIORIDADE
+		for(i=0;i<300;i++)
+		{			
+			sleep(timeslice);
+			if(i<count)
+			{	
+				semaforoP(semId);
+				strcpy(executando->nome, proc[i].nome);
+				proc[i].pid = criaProcesso(executando);
+				Insere_Lista(prontos, proc[i].prioridade, proc[i].nome, proc[i].temporestante, proc[i].pid);
+			}
+			if(executando->temporestante == 0)
+			{		
+				puts("aaa");
+				executando->prioridade = 1000;
+				//kill(aux->pid, SIGKILL);
+			}	
+		
+			
+			if(i==0)//Primeiro processo
 			{
-				addLista(proc[i], prio1);
-				prio1->contador = executando->contador;
-				nav = achaUltimo(prio1);// Acha o ultimo processo que foi adicionado	
-				nav->pid = criaProcesso(nav);
-				aux->pid = nav->pid;
-				strcpy(aux->path, nav->path);
-				aux->prioridade = nav->prioridade;
-				aux->contador = nav->contador;			
-				kill(getpid(), SIGUSR1);
+				aux = Procura_min_pri(prontos);
+				strcpy(executando->nome, aux->nome);
+				executando->pid = aux->pid;
+				executando->prioridade = aux->prioridade;
+				executando->temporestante = aux->temporestante;
+				Remove(prontos, aux);//Tirando aux da lista de prontos, agora ele esta em Executando
+				kill(executando->pid, SIGCONT);
+				executando->temporestante--;				
+			}
+			
+			else if(executando->prioridade > Procura_min_pri(prontos)->prioridade)
+			{	
+				kill(executando->pid, SIGSTOP); //Achou com prioridade menor
+				Insere_Lista(prontos, executando->prioridade, executando->nome, executando->temporestante, executando->pid);	
+				puts("entrou");	
+				aux = Procura_min_pri(prontos);
+				strcpy(executando->nome, aux->nome);
+				executando->pid = aux->pid;
+				executando->prioridade = aux->prioridade;
+				executando->temporestante = aux->temporestante;
+				Remove(prontos, aux); //Tirando aux da lista de prontos agora ele esta em Executando
+				kill(executando->pid, SIGCONT);
+				
+				
 				
 			}
+			executando->temporestante--;
 			
-			else if(proc[i].prioridade == 2)
-			{
-				addLista(proc[i], prio2);
-				prio2->contador = executando->contador;
-				nav = achaUltimo(prio2);// Acha o ultimo processo que foi adicionado	
-				nav->pid = criaProcesso(nav);
-				aux->pid = nav->pid;
-				strcpy(aux->path, nav->path);
-				aux->prioridade = nav->prioridade;
-				aux->contador = nav->contador;			
-				kill(getpid(), SIGUSR1);
-			}
 			
-			else if(proc[i].prioridade == 3)
-			{
-				addLista(proc[i], prio3);
-				prio3->contador = executando->contador;
-				nav = achaUltimo(prio3);// Acha o ultimo processo que foi adicionado	
-				nav->pid = criaProcesso(nav);
-				aux->pid = nav->pid;
-				strcpy(aux->path, nav->path);
-				aux->prioridade = nav->prioridade;
-				aux->contador = nav->contador;			
-				kill(getpid(), SIGUSR1);
-			}
-			
-			else if(proc[i].prioridade == 4)
-			{
-				addLista(proc[i], prio4);
-				prio4->contador = executando->contador;
-				nav = achaUltimo(prio4);// Acha o ultimo processo que foi adicionado	
-				nav->pid = criaProcesso(nav);
-				aux->pid = nav->pid;
-				strcpy(aux->path, nav->path);
-				aux->prioridade = nav->prioridade;
-				aux->contador = nav->contador;			
-				kill(getpid(), SIGUSR1);
-			}
-			
-			else if(proc[i].prioridade == 5)
-			{
-				addLista(proc[i], prio5);
-				prio5->contador = executando->contador;
-				nav = achaUltimo(prio5);// Acha o ultimo processo que foi adicionado	
-				nav->pid = criaProcesso(nav);
-				aux->pid = nav->pid;
-				strcpy(aux->path, nav->path);
-				aux->prioridade = nav->prioridade;
-				aux->contador = nav->contador;			
-				kill(getpid(), SIGUSR1);
-			}
-			
-			else if(proc[i].prioridade == 6)//ROUND-ROBIN TALVEZ SIGUSR2
-			{	
-				addLista(proc[i], prio6);
-				prio6->contador = executando->contador;
-				nav = achaUltimo(prio6);// Acha o ultimo processo que foi adicionado	
-				nav->pid = criaProcesso(nav);
-				aux->pid = nav->pid;
-				strcpy(aux->path, nav->path);
-				aux->prioridade = nav->prioridade;
-				aux->contador = nav->contador;			
-				kill(getpid(), SIGUSR1);
-			}
-			
-			else if(proc[i].prioridade == 7)
-			{
-				addLista(proc[i], prio7);
-				prio7->contador = executando->contador;
-				nav = achaUltimo(prio7);// Acha o ultimo processo que foi adicionado	
-				nav->pid = criaProcesso(nav);
-				aux->pid = nav->pid;
-				strcpy(aux->path, nav->path);
-				aux->prioridade = nav->prioridade;
-				aux->contador = nav->contador;			
-				kill(getpid(), SIGUSR1);
-			}
-			i++;
-		}
-		
-		waitpid(-1, &status, 0);			
-		
-		
-		while(1)
-		{
-			sleep(timeslice);
 		}
 	
-		
-		
 	
+		waitpid(-1, &status, 0);
 		
-	free(prio1);
-	free(prio2);
-	free(prio3);
-	free(prio4);
-	free(prio5);
-	free(prio6);
-	free(prio7);	
 	}
-
+	
 	
 	
 	shmdt((void *) executando);
@@ -280,7 +375,7 @@ int main()
 
 }
 
-//-----------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------
 int setSemValue(int semId)
 {
 	union semun semUnion;
@@ -311,7 +406,7 @@ int semaforoV(int semId)
 	return 0;
 }
 
-int criaProcesso (Processos *executando) 
+int criaProcesso (No *executando) 
 {
 	int pid;
 	pid = fork(); /* Executa o fork */
@@ -338,142 +433,33 @@ int criaProcesso (Processos *executando)
 	} 
 
 	else { /* FILHO */
-		execv(executando->path, NULL);
-	}
-	return 0;
-}	
-
-void initLista(Processos *l)
-{
-	l->prox = NULL;
-
-}	
-
-int addLista(Processos proc, Processos *l)
-{
-	
-	Processos *aux = l;
-	Processos *novo = (Processos*)malloc(sizeof(Processos));
-	if(novo==NULL)                     
-    {
-        printf("Memoria nao alocada");
-        return -1;
-    }
-    
-    novo->pid = proc.pid;
-    novo->prioridade = proc.prioridade;
-    strcpy(novo->path, proc.path);
-    novo->contador = 0;
-
-	
-	if(l->prox == NULL)//Lista esta vazia
-	{
-		l->pid = proc.pid;
-		l->prioridade = proc.prioridade;
-		l->prox = l;
-		l->contador = 0;
-		strcpy(l->path, proc.path);
-		free(novo);
-	}
-	
-	else
-	{
-		
-		while(aux->prox != l) //Quero o final da lista circular
-		{
-			aux = aux->prox;
-		}
-		novo->prox = aux->prox;
-		aux->prox = novo;
-				
-		
-	}
-	
-	return 0;
-}
-
-int removeProcLista(Processos *l)//Nao funciona
-{
-	Processos *aux, *nav = l;
-	if((l->prox == l) && (l->contador == 3))//So tem 1 iten na lista
-	{	
-		l->prox = NULL;
-	}
-	while(nav->prox != l)
-	{
-		if(nav->prox->contador == 3)
-		{
-			aux = nav->prox;
-			nav->prox = aux->prox;
-			free(aux);
-			
-		}
-		nav = nav->prox;
-	}
-	printf("Nenhum processo terminou\n");
-	return -1;
-}
-
-Processos *achaUltimo(Processos *l)
-{
-	Processos *nav = l;
-	
-	if(l->prox == l)
-		return l;
-		
-	else
-	{
-		while(nav->prox != l)
-		{
-			nav = nav->prox;
-		}
-		return nav;
-	}
-	puts("Nao achou");	
-}
-
-int deletaLista(Processos *l)
-{
-	Processos *aux;
-	while(l->prox != NULL)
-	{
-		aux = l;
-		l = l->prox;
-		free(aux);
+		execv(executando->nome, NULL);
 	}
 	return 0;
 }
+
+
 
 
 void signalhandler(int signal)
 {
 	if(signal == SIGUSR1)
 	{
-		if(executando->prioridade >= aux->prioridade) //Executando tem menos prioridade entao troca
-		{	
-				
-			if(aux->prioridade < 6 )//PRIORIDADE
-			{	
-				if(executando->prioridade != 100)
-					kill(executando->pid, SIGSTOP);
-				executando->pid = aux->pid;
-				strcpy(executando->path, aux->path);
-				executando->prioridade = aux->prioridade;
-				executando->contador = aux->contador;
-				kill(executando->pid, SIGCONT);
-				executando->contador++;
-				
-			}
-			else//ROUND-ROBIN
-			{
-				
-			}
-			
-				
-		}
+		
+		
 	}
 
 }
+
+
+
+
+
+
+
+
+
+
 
 
 
