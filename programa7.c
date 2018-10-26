@@ -15,14 +15,13 @@ int main()
 	
 	
 	
-	printf("%d\n" ,getpid());
-	while(i<3)
+	
+	while(i<10)
 	{
 		sleep(1);
-		printf("Processo executando 7\n");
+		
 		i++;
 	}
-	
 	
 
 	return 0;

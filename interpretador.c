@@ -9,7 +9,8 @@
 #include <signal.h>
 #include <sys/sem.h>
 
-#define count 7 
+#define count 3 //SEMPRE TEM QUE SER IGUAL AO NUMERO DE PROGRAMAS
+
 #define timeslice 1
 
 
@@ -17,10 +18,11 @@
 
 typedef struct No
 {
-    char nome[100];
+    char nome[30];
     int pid;
     int prioridade;
 	int temporestante;
+	int tempoio; //IO
     struct No *prox;
 
 }No;
@@ -44,7 +46,7 @@ Head*  Cria_Lista ()
 }
 
 
-int Insere_Lista (Head* lista, int pri, char nome[100],int temporestante ,int pid)
+int Insere_Lista (Head* lista, int pri, char nome[100],int temporestante, int tempoio ,int pid)
 {
    if(lista==NULL)
    {
@@ -61,6 +63,7 @@ int Insere_Lista (Head* lista, int pri, char nome[100],int temporestante ,int pi
    node->prioridade=pri;
    strcpy(node->nome,nome);
    node->temporestante = temporestante;
+   node->tempoio = tempoio;
    node->prox=NULL;
    lista->n++;
 
@@ -202,9 +205,8 @@ No* Procura_min_pri (Head*lista)
 
 No *executando, *aux;
 
-int criaProcesso (No *executando);
+int criaProcesso (No proc);
 
-void signalhandler(int signal);
 
 union semun
 {
@@ -230,7 +232,6 @@ int main()
 	
 	No *proc; //Array de struct de processos
 	
-	int *j;
 	
 
 	//CRIANDO ARRAY DE PROCESSOS NA MEMORIA COMPARTILHADA
@@ -239,9 +240,7 @@ int main()
 
  	semId = semget (IPC_PRIVATE, 1, 0666 | IPC_CREAT);
    	setSemValue(semId);
-    sleep (2);
 	
-	shmid2 = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 	shmid = shmget(IPC_PRIVATE, count*sizeof(No), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 	shmidexec = shmget(IPC_PRIVATE, sizeof(No), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
 	shmidaux = shmget(IPC_PRIVATE, sizeof(No), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
@@ -251,20 +250,20 @@ int main()
 	aux = (No *)shmat(shmidaux, 0, 0);
 	proc = (No *)shmat(shmid, 0, 0);
 
-	j = (int *)shmat(shmid2, 0, 0);
-	*j = 0;
 	
 	executando->pid = 100;
 	executando->prioridade = 100;
 	strcpy(executando->nome, " ");
-	executando->temporestante = 3;
+	executando->temporestante = 2;
+	executando->tempoio = 3;
 	
 	for(i=0;i<count;i++)
 	{		
 		proc[i].pid = 100;
 		proc[i].prioridade = 100;
 		strcpy(proc[i].nome, " ");
-		proc[i].temporestante = 3;
+		proc[i].temporestante = 2;
+		proc[i].tempoio = 3;
 	}
 	//FIM CRIACAO DO ARRAY
 
@@ -272,6 +271,7 @@ int main()
 	if(pid = (fork() != 0)) //Processo pai
 	{
 		FILE *arq;
+		int j = 0;
 		char programas[]="exec.txt",
 	    ch1[100], ch2[100], ch3[100];
 		//Lendo arquivo com processos
@@ -282,12 +282,14 @@ int main()
 			while( (fscanf(arq,"%s %s %s\n", &ch1, &ch2, &ch3))!=EOF )
 				{
 					
-					strcpy(proc[*j].nome, ch2); //PATH DO PROGRAMA	
-					proc[*j].prioridade = atoi(&ch3[11]); //PRIORIDADE
-					proc[*j].temporestante = 3;
-					//printf("%s %d--\n", proc[*j].nome, proc[*j].prioridade);			
-					
-					*j = *j + 1;
+					strcpy(proc[j].nome, ch2); //PATH DO PROGRAMA	
+					proc[j].prioridade = atoi(&ch3[11]); //PRIORIDADE
+					proc[j].temporestante = 2;
+					proc[j].tempoio = 3;
+							
+					proc[j].pid = criaProcesso(proc[j]);
+					//printf("%s %d %d--\n", proc[j].nome, proc[j].prioridade, proc[j].pid);	
+					j++;
 					sleep(1);
 					semaforoV(semId);
 					
@@ -295,7 +297,8 @@ int main()
 	
 		fclose(arq);
 		//Fechando arquivo com processos
-		waitpid(-1, &status, 0);
+		for(i=0; i<count; i++)
+			waitpid(-1, &status, 0);
 		
 	}
 	else 
@@ -303,68 +306,110 @@ int main()
 		
 		Head *prontos = Cria_Lista(); //Insere_Lista (Head* lista, int pri, char nome, int temporestante, int pid)
 		Head *esperando = Cria_Lista();
-		No* pront;
-		No *aux3, *aux4;
+		No* wait;
+		int i;
 		int k = 0;
 		//Procura_pid(prontos, executando->pid);
 		//Procura_min_pri (Head*lista)
 		//Procura_pri(head*lista)
 		//Remove(Head*lista, No* node)
-		
-		for(i=0;i<300;i++)
-		{			
-			sleep(timeslice);
-			if(i<count)
-			{	
-				semaforoP(semId);
-				strcpy(executando->nome, proc[i].nome);
-				proc[i].pid = criaProcesso(executando);
-				Insere_Lista(prontos, proc[i].prioridade, proc[i].nome, proc[i].temporestante, proc[i].pid);
-			}
-			if(executando->temporestante == 0)
-			{		
-				puts("aaa");
-				executando->prioridade = 1000;
-				//kill(aux->pid, SIGKILL);
-			}	
-		
-			
-			if(i==0)//Primeiro processo
+		printf("PID: %d\n", getpid());
+		for(k=0;k<30;k++)
+		{	
+			if(wait == NULL)
 			{
-				aux = Procura_min_pri(prontos);
-				strcpy(executando->nome, aux->nome);
-				executando->pid = aux->pid;
-				executando->prioridade = aux->prioridade;
-				executando->temporestante = aux->temporestante;
-				Remove(prontos, aux);//Tirando aux da lista de prontos, agora ele esta em Executando
-				kill(executando->pid, SIGCONT);
-				executando->temporestante--;				
+				wait =(No*)malloc(sizeof(No));
 			}
 			
-			else if(executando->prioridade > Procura_min_pri(prontos)->prioridade)
+			if(size(esperando)>0)
+			{			
+				kill(aux->pid, SIGSTOP);
+					printf("%d - Processo %s entrou em IO\n", k, aux->nome);
+				
+				if(aux->prox != NULL)
+				{	
+					kill(aux->pid, SIGSTOP);
+					printf("%d - Processo %s entrou em IO\n", k, aux->prox->nome);
+				}	
+				for(i=0;i<size(esperando);i++)
+				{
+					
+					
+					
+					aux->tempoio--;
+					if(aux->tempoio == 0)
+					{
+						executando = aux;
+						executando->tempoio = 3;
+						Insere_Lista(prontos, executando->prioridade, executando->nome, executando->temporestante, executando->tempoio, executando->pid);
+						Remove(esperando,aux);
+						executando->pid = 100;
+					}	
+					if(aux->prox != NULL)
+						aux = aux->prox;
+				}							
+			}
+			
+			
+					
+			if(k<count)
+			{
+				semaforoP(semId);	
+				Insere_Lista(prontos, proc[k].prioridade, proc[k].nome, proc[k].temporestante, proc[k].tempoio, proc[k].pid);	
+			}
+			if(executando->temporestante < 1)
+			{
+				printf("%d - Processo %s terminou.\n", k, executando->nome);
+				kill(executando->pid, SIGSTOP);
+				executando->prioridade = 1000;
+				executando = Procura_min_pri(prontos);
+				kill(executando->pid, SIGCONT);
+				printf("%d - Processo %s executando.\n", k, executando->nome);
+				
+			}
+			
+			
+			if(executando->pid == 100)//Primeiro processo
+			{
+				executando = Procura_min_pri(prontos);
+				kill(executando->pid, SIGCONT);
+				printf("%d - Processo %s executando.\n", k, executando->nome);
+			}
+			if(executando->prioridade > Procura_min_pri(prontos)->prioridade)//Prioridade maior que de executando achada
 			{	
-				kill(executando->pid, SIGSTOP); //Achou com prioridade menor
-				Insere_Lista(prontos, executando->prioridade, executando->nome, executando->temporestante, executando->pid);	
-				puts("entrou");	
-				aux = Procura_min_pri(prontos);
-				strcpy(executando->nome, aux->nome);
-				executando->pid = aux->pid;
-				executando->prioridade = aux->prioridade;
-				executando->temporestante = aux->temporestante;
-				Remove(prontos, aux); //Tirando aux da lista de prontos agora ele esta em Executando
-				kill(executando->pid, SIGCONT);
-				
-				
+				kill(executando->pid, SIGSTOP);
+				printf("%d - Processo %s pausou.\n", k, executando->nome);
+				executando = Procura_min_pri(prontos);
+				//printf("%d prioridade\n", executando->prioridade);
+				if(executando->prioridade == 6)// Tem operacao de IO
+				{
+					kill(executando->pid, SIGCONT);
+					printf("%d - Processo %s executando.\n", k, executando->nome);
+					executando->temporestante--;
+					Insere_Lista(esperando, executando->prioridade, executando->nome, executando->temporestante, executando->tempoio, executando->pid);
+					Remove(prontos, executando);
+					executando->prioridade = 100;
+					aux = esperando->inicio;
+					
+				}
+					
+				else
+				{
+					kill(executando->pid, SIGCONT);
+					printf("%d - Processo %s executando.\n", k, executando->nome);
+				}
+				//printf("temporestante %d\n", executando->temporestante);
 				
 			}
-			executando->temporestante--;
-			
-			
+			//printf("temporestante %d\n", executando->temporestante);
+			if(executando->prioridade!=100)
+			{
+				executando->temporestante--;	
+			}	
+			sleep(timeslice);
 		}
-	
-	
+		 
 		waitpid(-1, &status, 0);
-		
 	}
 	
 	
@@ -406,21 +451,11 @@ int semaforoV(int semId)
 	return 0;
 }
 
-int criaProcesso (No *executando) 
+int criaProcesso (No proc) 
 {
 	int pid;
-	pid = fork(); /* Executa o fork */
+	pid = fork();
   
-	/*if(executando->pid != -1)
-	{	
-		kill(executando->pid, SIGSTOP);
-		proc[count-1].prioridade = executando->prioridade;
-		strcpy(proc[count-1].path, executando->path);
-		proc[count-1].pid = executando->pid;
-  	}
-	strcpy(executando->path, proc[0].path); 
-	executando->prioridade = proc[0].prioridade;
-	*/
 
 	if (pid < 0) {
 	return -1;
@@ -433,23 +468,11 @@ int criaProcesso (No *executando)
 	} 
 
 	else { /* FILHO */
-		execv(executando->nome, NULL);
+		execv(proc.nome, NULL);
 	}
 	return 0;
 }
 
-
-
-
-void signalhandler(int signal)
-{
-	if(signal == SIGUSR1)
-	{
-		
-		
-	}
-
-}
 
 
 

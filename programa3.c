@@ -16,17 +16,15 @@ int main()
 	
 	
 	
-	printf("%d\n" ,getpid());
 	
-	while(i<3)
+	
+	while(i<10)
 	{
-		sleep(1);
-		printf("Processo executando 3\n");
 		i++;
+		sleep(1);
 	}
 	
 	
-
 
 	return 0;
 
