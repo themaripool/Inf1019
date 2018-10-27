@@ -13,7 +13,7 @@
 #include <errno.h>
 
 
-#define count 4 //SEMPRE TEM QUE SER IGUAL AO NUMERO DE PROGRAMAS
+#define count 3 //SEMPRE TEM QUE SER IGUAL AO NUMERO DE PROGRAMAS
 
 #define timeslice 1
 
@@ -359,7 +359,7 @@ int main()
 				if(aux->prox != NULL)
 				{	
 					kill(aux->pid, SIGSTOP);
-					printf("%d - Processo %s entrou em IO\n", k, aux->prox->nome);
+					//printf("%d - Processo %s entrou em IO\n", k, aux->prox->nome);
 					
 				}	
 			
@@ -455,6 +455,11 @@ int main()
 					executando->prioridade = 100;
 		
 					aux = esperando->inicio;
+					
+					if (size(esperando) == 0){
+						kill(executando->pid, SIGSTOP);
+						executando = prontos->inicio;
+					}
 					
 					
 	
@@ -552,4 +557,17 @@ int criaProcesso (No proc)
 	}
 	return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
