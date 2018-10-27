@@ -1,9 +1,0 @@
-exec ex2 prioridade=1
-exec ex3 prioridade=8
-exec ex4 prioridade=3
-exec ex5 prioridade=7
-exec ex6 prioridade=4
-exec ex7 prioridade=2
-exec ex8 prioridade=5
-
-
