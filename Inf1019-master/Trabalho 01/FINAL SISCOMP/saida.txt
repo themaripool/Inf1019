@@ -1,0 +1,10 @@
+0 - Processo ex2 iniciou execucao.
+1 - Processo ex2 pausou.
+1 - Processo ex3 iniciou execucao.
+2 - Processo ex3 pausou.
+2 - Processo ex4 iniciou execucao.
+4 - Processo ex4 terminou.
+4 - Processo ex3 iniciou execucao.
+5 - Processo ex3 terminou.
+5 - Processo ex2 iniciou execucao.
+6 - Processo ex2 terminou.
