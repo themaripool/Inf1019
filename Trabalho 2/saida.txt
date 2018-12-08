@@ -1,0 +1,6 @@
+Nome: matriz.log
+Algoritmo: NRU
+Tamanho da pagina: 32
+Tamanho da memoria fisica: 1
+Page Faults: 264693
+Escritas: 21631
